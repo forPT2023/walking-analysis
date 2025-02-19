@@ -11,15 +11,20 @@ import openai
 import json
 
 # ✅ 環境変数を読み込む
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# ✅ 環境変数が取得できていない場合のエラーハンドリング
+if not SUPABASE_URL or not SUPABASE_KEY or not OPENAI_API_KEY:
+    st.error("❌ 環境変数が正しく設定されていません！Render または Streamlit Cloud の Environment Variables を確認してください。")
+    st.stop()
 
 # ✅ Supabase クライアントを作成
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ✅ OpenAI クライアントを作成
-client = OpenAI(api_key=OPENAI_API_KEY)
+# ✅ OpenAI API キーの設定
+openai.api_key = OPENAI_API_KEY
 
 # ✅ Mediapipe のセットアップ
 mp_pose = mp.solutions.pose
@@ -41,7 +46,7 @@ if uploaded_file:
     # ✅ 保存用の動画ファイルを作成
     output_video_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    fps = max(1, int(cap.get(cv2.CAP_PROP_FPS)))  # FPSが0になるケースを防ぐ
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
@@ -72,7 +77,7 @@ if uploaded_file:
                 results = pose.process(image)
 
                 if results.pose_landmarks:
-                    frame_data = {"Time (s)": cap.get(cv2.CAP_PROP_POS_FRAMES) / cap.get(cv2.CAP_PROP_FPS)}
+                    frame_data = {"Time (s)": cap.get(cv2.CAP_PROP_POS_FRAMES) / fps}
                     for joint_name, joint_id in JOINTS.items():
                         landmark = results.pose_landmarks.landmark[joint_id]
                         frame_data[f"{joint_name}_Y"] = landmark.y
@@ -122,28 +127,17 @@ if uploaded_file:
             あなたは歩行解析の専門家です。
             以下の解析結果をわかりやすく解説してください：
             {json.dumps(scores_json, indent=2, ensure_ascii=False)}
-            どのスコアが良く、どのスコアが改善の余地があるか説明してください。
             """
 
-            response = client.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "あなたは歩行解析の専門家です。"},
                     {"role": "user", "content": prompt}
                 ]
             )
-
-            return response.choices[0].message.content
+            return response["choices"][0]["message"]["content"]
 
         ai_analysis = generate_ai_analysis(scores)
-
         st.subheader("📖 AI による解析解説")
         st.write(ai_analysis)
-
-        # ✅ Supabase にデータを保存
-        supabase.table("walking_analysis").insert({
-            "scores": json.dumps(scores),
-            "ai_analysis": ai_analysis
-        }).execute()
-
-        st.success("データをクラウドに保存しました！")
