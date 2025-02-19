@@ -9,10 +9,6 @@ import plotly.express as px
 from supabase import create_client, Client
 import openai
 import json
-from dotenv import load_dotenv  # Render 以外の環境（ローカル）用
-
-# ✅ .env から環境変数をロード（Render 以外のローカル環境用）
-load_dotenv()
 
 # ✅ 環境変数を読み込む
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -21,7 +17,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ✅ 環境変数が取得できていない場合のエラーハンドリング
 if not SUPABASE_URL or not SUPABASE_KEY or not OPENAI_API_KEY:
-    st.error("❌ 環境変数が正しく設定されていません！Render の Environment Variables を確認してください。")
+    st.error("❌ 環境変数が正しく設定されていません！Render または Streamlit Cloud の Environment Variables を確認してください。")
     st.stop()
 
 # ✅ Supabase クライアントを作成
@@ -100,6 +96,31 @@ if uploaded_file:
         df = pd.DataFrame(joint_data)
         st.write("✅ 解析完了！")
 
+        # ✅ 歩行バランスのグラフを表示
+        fig = px.line(df, x="Time (s)", y=["LEFT_KNEE_Y", "RIGHT_KNEE_Y", "LEFT_ANKLE_Y", "RIGHT_ANKLE_Y"],
+                      title="歩行バランスの変化", labels={"value": "関節の高さ", "variable": "関節"})
+        st.plotly_chart(fig)
+
+        # ✅ 解析動画を表示
+        st.subheader("🎥 解析結果の動画")
+        st.video(output_video_path)
+
+        # ✅ 解析動画をダウンロード
+        with open(output_video_path, "rb") as file:
+            st.download_button("📥 解析動画をダウンロード", file, file_name="walking_analysis.mp4", mime="video/mp4")
+
+        # ✅ 歩行スコアを計算
+        def calculate_gait_scores(df):
+            scores = {}
+            scores["Stability Score"] = max(0, 100 - (df["LEFT_KNEE_Y"].std() + df["RIGHT_KNEE_Y"].std()) * 50)
+            step_intervals = np.diff(df["Time (s)"])
+            scores["Gait Rhythm Score"] = max(0, 100 - np.std(step_intervals) * 500)
+            scores["Symmetry Score"] = max(0, 100 - np.mean(np.abs(df["LEFT_KNEE_Y"] - df["RIGHT_KNEE_Y"])) * 500)
+            return scores
+
+        scores = calculate_gait_scores(df)
+        st.metric(label="歩行安定度スコア", value=f"{scores['Stability Score']:.1f} / 100")
+
         # ✅ AI に解析データを送信し、解説を取得
         def generate_ai_analysis(scores_json):
             prompt = f"""
@@ -108,7 +129,6 @@ if uploaded_file:
             {json.dumps(scores_json, indent=2, ensure_ascii=False)}
             """
 
-            # ✅ 最新APIに修正
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -116,11 +136,8 @@ if uploaded_file:
                     {"role": "user", "content": prompt}
                 ]
             )
-            ai_analysis = response['choices'][0]['message']['content']
-            return ai_analysis
+            return response["choices"][0]["message"]["content"]
 
-        # ✅ AI解析の実行
-        scores = {"Stability Score": 85, "Gait Rhythm Score": 90, "Symmetry Score": 88}
         ai_analysis = generate_ai_analysis(scores)
         st.subheader("📖 AI による解析解説")
         st.write(ai_analysis)
