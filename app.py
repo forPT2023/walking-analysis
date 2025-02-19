@@ -9,15 +9,24 @@ import plotly.express as px
 from supabase import create_client, Client
 import openai
 import json
+from dotenv import load_dotenv  # Render 以外の環境（ローカル）用
+
+# ✅ .env から環境変数をロード（Render 以外のローカル環境用）
+load_dotenv()
 
 # ✅ 環境変数を読み込む
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# ✅ 環境変数の確認（デバッグ用）
+st.write("DEBUG - SUPABASE_URL:", SUPABASE_URL)
+st.write("DEBUG - SUPABASE_KEY:", SUPABASE_KEY)
+st.write("DEBUG - OPENAI_API_KEY:", OPENAI_API_KEY)
+
 # ✅ 環境変数が取得できていない場合のエラーハンドリング
 if not SUPABASE_URL or not SUPABASE_KEY or not OPENAI_API_KEY:
-    st.error("❌ 環境変数が正しく設定されていません！Render または Streamlit Cloud の Environment Variables を確認してください。")
+    st.error("❌ 環境変数が正しく設定されていません！Render の Environment Variables を確認してください。")
     st.stop()
 
 # ✅ Supabase クライアントを作成
@@ -136,7 +145,8 @@ if uploaded_file:
                     {"role": "user", "content": prompt}
                 ]
             )
-            return response["choices"][0]["message"]["content"]
+            ai_analysis = response.choices[0].message['content']
+            return ai_analysis
 
         ai_analysis = generate_ai_analysis(scores)
         st.subheader("📖 AI による解析解説")
