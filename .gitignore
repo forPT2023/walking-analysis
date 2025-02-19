@@ -1,0 +1,23 @@
+# バーチャル環境を無視
+venv/
+__pycache__/
+
+# MacOS の不要ファイル
+.DS_Store
+
+# Python バイナリファイル
+*.pyc
+*.pyo
+*.pyd
+
+# 大きなライブラリファイルを無視
+*.dylib
+*.so
+*.dll
+
+.streamlit/secrets.toml
+.env
+.streamlit/secrets.toml
+venv/
+__pycache__/
+*.pyc
