@@ -18,12 +18,13 @@
   },
   "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; export PATH=$PATH:/home/codespace/.local/bin; echo '✅ Packages installed and Requirements met'",
   "postAttachCommand": {
-    "server": "export PATH=$PATH:/home/codespace/.local/bin && streamlit run app.py --server.enableCORS false --server.enableXsrfProtection false"
+    "server": "export PATH=$PATH:/home/codespace/.local/bin && streamlit run app.py --server.address=0.0.0.0 --server.port=8501 --server.enableCORS false --server.enableXsrfProtection false"
   },
   "portsAttributes": {
     "8501": {
       "label": "Application",
-      "onAutoForward": "openPreview"
+      "onAutoForward": "openPreview",
+      "protocol": "http"
     }
   },
   "forwardPorts": [
